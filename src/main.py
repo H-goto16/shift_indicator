@@ -1,3 +1,4 @@
+from os import GRND_NONBLOCK
 from machine import Pin
 import time
 
@@ -10,6 +11,34 @@ import time
 ## GP6 left top
 ## GP7 center middle
 ## GP8 off
+
+## = 7 Segments LED =
+##      -- GP5 --
+##  GP6|         |GP4
+##      -- GP7 --
+##  GP3|         |GP1
+##      -- GP2 --  .GP0
+##         VSYS
+
+
+## = 7 Segments Pin assign =
+## RT RT OFF TOP RT
+##       8.
+## LB BM INPUT RB DECIMAL
+
+## Raspico Pin assign
+# GP0 VBUS
+# GP1 VSYS
+# GND GND
+# GP2
+# GP3
+# GP4
+# GP5
+# GND
+# GP6
+# GP7
+# GP8
+
 
 DECIMAL = Pin(0, Pin.OUT)
 RIGHT_BOTTOM = Pin(1, Pin.OUT)
