@@ -1,4 +1,3 @@
-from os import GRND_NONBLOCK
 from machine import Pin
 import time
 
@@ -49,6 +48,7 @@ TOP = Pin(5, Pin.OUT)
 LEFT_TOP = Pin(6, Pin.OUT)
 CENTER = Pin(7, Pin.OUT)
 OFF = Pin(8, Pin.OUT)
+LED = Pin(25, Pin.OUT)
 
 pins = [TOP, RIGHT_TOP, RIGHT_BOTTOM, BOTTOM, LEFT_BOTTOM, LEFT_TOP, CENTER, DECIMAL]
 
@@ -64,18 +64,98 @@ digit_map = {
     7: [1, 1, 1, 0, 0, 1, 0, 0],
     8: [1, 1, 1, 1, 1, 1, 1, 0],
     9: [1, 1, 0, 1, 1, 1, 1, 0],
-    "R": [1, 1, 1, 0, 1, 1, 1, 0]
+    "R": [1, 1, 1, 0, 1, 1, 1, 0],
+    "L": [0, 0, 0, 1, 1, 1, 0, 0],
+    "E": [1, 0, 0, 1, 1, 1, 1, 1],
+    "S": [1, 0, 1, 1, 0, 1, 1, 1],
+    "A": [1, 1, 1, 0, 1, 1, 1, 1],
+    "V": [0, 1, 1, 1, 1, 1, 0, 1],
 }
+
+class SmartButton:
+    def __init__(self, pin_func, threshold_ms=3000):
+        self.get_value = pin_func
+        self.threshold = threshold_ms
+        self.start_time = None
+        self.long_pressed = False
+        self.clicked = False
+
+    def check(self):
+        is_pressed = self.get_value() == 1
+
+        if is_pressed:
+            if self.start_time is None:
+                self.start_time = time.ticks_ms()
+                self.long_pressed = False
+                self.clicked = False
+            else:
+                elapsed = time.ticks_diff(time.ticks_ms(), self.start_time)
+                if elapsed > self.threshold and not self.long_pressed:
+                    self.long_pressed = True
+                    return True
+        else:
+            if self.start_time is not None:
+                if not self.long_pressed:
+                    self.clicked = True
+
+            self.start_time = None
+            self.long_pressed = False
+
+        return False
+
+    def is_clicked(self):
+        if self.clicked:
+            self.clicked = False
+            return True
+        return False
+
+def clear():
+    for pin in pins:
+        pin.value(1)
 
 def DisplayNumber(number):
     map = digit_map[number]
     for index, pin in enumerate(pins):
         pin.value(not map[index])
 
-def initalization():
-    for pin in pins:
-        pin.value(1)
+def long_press(threshold):
+    start_time = time.ticks_ms()
+    while True:
+        if time.ticks_ms() - start_time > threshold:
+            return True
+        else:
+            return False
 
+def calibration(button_obj):
+    modes = [0, 1, 2, 3, 4, 5, "R"]
+    current_idx = -1
+
+    saved_values = {}
+
+    DisplayNumber("L")
+    print("Entered Calibration Mode")
+
+    while True:
+        is_long = button_obj.check()
+
+        if is_long:
+            print(f"Final Data Saved: {saved_values}")
+            for char in ["S", "A", "V", "E"]:
+                DisplayNumber(char)
+                time.sleep(0.1)
+            clear()
+            break
+
+        if button_obj.is_clicked():
+            current_idx = (current_idx + 1) % len(modes)
+            target_mode = modes[current_idx]
+            DisplayNumber(target_mode)
+            print(f"Mode: {target_mode} (Index: {current_idx})")
+
+        time.sleep(0.01)
+
+def initalization():
+    clear()
     for i in range(10):
         duration = 0.01
         DECIMAL.value(0)
@@ -98,15 +178,25 @@ def initalization():
         RIGHT_BOTTOM.value(0)
         time.sleep(duration)
         RIGHT_BOTTOM.value(1)
+    clear()
 
 def main():
+    print("Shift Indicator Booting...")
     initalization()
-    for i in range(6):
-        DisplayNumber(i)
-        time.sleep(0.5)
 
-    DisplayNumber("R")
+    start_time = None
+    bootsel_botton = SmartButton(rp2.bootsel_button, 3000)
 
+    print("Display Current Shift Pattern")
+    while True:
+        try:
+            if bootsel_botton.check():
+                print("Calibration")
+                calibration(bootsel_botton)
+
+        except Exception as e:
+            DisplayNumber("E")
+            print(e)
 
 
 if __name__ == "__main__":
